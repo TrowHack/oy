@@ -18,18 +18,15 @@ local function setupDrag(frame)
             startPos.Y.Scale, 
             startPos.Y.Offset + Delta.Y
         )
-        
         TweenService:Create(frame, TweenInfo.new(0.15), {Position = Position}):Play()
     end
 
     frame.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) 
             and UserInputService:GetFocusedTextBox() == nil then
-            
             dragToggle = true
             dragStart = input.Position
             startPos = frame.Position
-            
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
                     dragToggle = false
@@ -176,7 +173,6 @@ local function createBlizTNotification(text, isFinal)
     else
         return NotificationGui, rgbConnection
     end
-
     return NotificationGui
 end
 
@@ -236,7 +232,6 @@ local function createInfiniteYieldNotification(text, isFinal)
             end
         end)
     end
-
     return NotificationGui
 end
 
@@ -296,7 +291,6 @@ local function createCosmicNotification(text, isFinal)
             end
         end)
     end
-
     return NotificationGui
 end
 
@@ -679,71 +673,106 @@ local function createFullGUI()
         TelegramButton.ImageColor3 = Color3.fromRGB(255, 255, 255)
     end)
 
-    local function hideGUI()
+    local function closeGUI()
+        local closeTween = TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(1.5, 0, mainFramePosition.Y.Scale, mainFramePosition.Y.Offset)
+        })
+        closeTween:Play()
+        
+        ToggleIcon.Visible = true
+        ToggleIcon.Position = UDim2.new(toggleIconPosition.X.Scale, toggleIconPosition.X.Offset, 1.5, toggleIconPosition.Y.Offset)
+        local iconTween = TweenService:Create(ToggleIcon, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = toggleIconPosition
+        })
+        iconTween:Play()
+        
+        closeTween.Completed:Wait()
         isGUIVisible = false
         MainFrame.Visible = false
-        ToggleIcon.Visible = true
     end
 
     local function showGUI()
-        isGUIVisible = true
+        ToggleIcon.Visible = true
+        local hideIconTween = TweenService:Create(ToggleIcon, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = UDim2.new(toggleIconPosition.X.Scale, toggleIconPosition.X.Offset, 1.5, toggleIconPosition.Y.Offset)
+        })
+        hideIconTween:Play()
+        hideIconTween.Completed:Connect(function()
+            ToggleIcon.Visible = false
+        end)
+        
+        MainFrame.Position = UDim2.new(-0.5, 0, mainFramePosition.Y.Scale, mainFramePosition.Y.Offset)
         MainFrame.Visible = true
-        ToggleIcon.Visible = false
+        local openTween = TweenService:Create(MainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+            Position = mainFramePosition
+        })
+        openTween:Play()
+        isGUIVisible = true
     end
 
     local function toggleGUI()
         if isGUIVisible then
-            hideGUI()
+            closeGUI()
         else
             showGUI()
         end
     end
 
-    CloseButton.MouseButton1Click:Connect(function()
-        hideGUI()
-    end)
+    CloseButton.MouseButton1Click:Connect(closeGUI)
 
     setupDrag(MainFrame)
 
-    local iconDragging = false
-    local iconDragStart, iconStartPos
+    local iconDragToggle = false
+    local iconDragInput, iconDragStart, iconStartPos
     local iconMoved = false
 
+    local function updateIconInput(input)
+        local Delta = input.Position - iconDragStart
+        local Position = UDim2.new(
+            iconStartPos.X.Scale, 
+            iconStartPos.X.Offset + Delta.X, 
+            iconStartPos.Y.Scale, 
+            iconStartPos.Y.Offset + Delta.Y
+        )
+        TweenService:Create(ToggleIcon, TweenInfo.new(0.15), {Position = Position}):Play()
+        toggleIconPosition = Position
+        
+        if math.abs(Delta.X) > 5 or math.abs(Delta.Y) > 5 then
+            iconMoved = true
+        end
+    end
+
     ToggleIcon.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            iconDragging = true
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) 
+            and UserInputService:GetFocusedTextBox() == nil then
+            iconDragToggle = true
             iconDragStart = input.Position
             iconStartPos = ToggleIcon.Position
             iconMoved = false
+            
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    iconDragToggle = false
+                end
+            end)
         end
     end)
 
     ToggleIcon.InputChanged:Connect(function(input)
-        if iconDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-            local delta = input.Position - iconDragStart
-            local moveDistance = math.abs(delta.X) + math.abs(delta.Y)
-            
-            if moveDistance > 5 then
-                iconMoved = true
-            end
-            
-            toggleIconPosition = UDim2.new(
-                iconStartPos.X.Scale, 
-                iconStartPos.X.Offset + delta.X,
-                iconStartPos.Y.Scale, 
-                iconStartPos.Y.Offset + delta.Y
-            )
-            ToggleIcon.Position = toggleIconPosition
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            iconDragInput = input
         end
     end)
 
-    ToggleIcon.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            if not iconMoved then
-                showGUI()
-            end
-            iconDragging = false
-            iconMoved = false
+    UserInputService.InputChanged:Connect(function(input)
+        if input == iconDragInput and iconDragToggle then
+            updateIconInput(input)
+        end
+    end)
+
+    ToggleIcon.MouseButton1Click:Connect(function()
+        if not iconDragToggle and not iconMoved then
+            showGUI()
         end
     end)
 
