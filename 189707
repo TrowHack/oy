@@ -536,16 +536,17 @@ local function createFullGUI()
             Position = UDim2.new(1.5, 0, mainFramePosition.Y.Scale, mainFramePosition.Y.Offset)
         })
         closeTween:Play()
-        closeTween.Completed:Wait()
-        isGUIVisible = false
-        MainFrame.Visible = false
         
-        -- Анимация появления ToggleIcon
+        -- Анимация появления ToggleIcon (сразу появляется и анимируется)
         ToggleIcon.Visible = true
         ToggleIcon.Position = UDim2.new(toggleIconPosition.X.Scale, toggleIconPosition.X.Offset, 1.5, toggleIconPosition.Y.Offset)
         TweenService:Create(ToggleIcon, TweenInfo.new(0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Position = toggleIconPosition
         }):Play()
+        
+        closeTween.Completed:Wait()
+        isGUIVisible = false
+        MainFrame.Visible = false
     end
 
     local function showGUI()
@@ -583,6 +584,7 @@ local function createFullGUI()
     -- Применяем такое же поведение перетаскивания для ToggleIcon
     local iconDragToggle = false
     local iconDragInput, iconDragStart, iconStartPos
+    local iconMoved = false
 
     local function updateIconInput(input)
         local Delta = input.Position - iconDragStart
@@ -592,6 +594,12 @@ local function createFullGUI()
             iconStartPos.Y.Scale, 
             iconStartPos.Y.Offset + Delta.Y
         )
+        
+        -- Проверяем, было ли движение
+        local moveDistance = math.abs(Delta.X) + math.abs(Delta.Y)
+        if moveDistance > 5 then
+            iconMoved = true
+        end
         
         TweenService:Create(ToggleIcon, TweenInfo.new(0.15), {Position = Position}):Play()
         toggleIconPosition = Position
@@ -604,6 +612,7 @@ local function createFullGUI()
             iconDragToggle = true
             iconDragStart = input.Position
             iconStartPos = ToggleIcon.Position
+            iconMoved = false
             
             input.Changed:Connect(function()
                 if input.UserInputState == Enum.UserInputState.End then
@@ -614,8 +623,9 @@ local function createFullGUI()
     end)
 
     ToggleIcon.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        if iconDragToggle and input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
             iconDragInput = input
+            updateIconInput(input)
         end
     end)
 
@@ -626,8 +636,17 @@ local function createFullGUI()
     end)
 
     ToggleIcon.MouseButton1Click:Connect(function()
-        if not iconDragToggle then
+        if not iconDragToggle and not iconMoved then
             showGUI()
+        end
+    end)
+
+    ToggleIcon.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            iconDragToggle = false
+            -- Сбрасываем флаг движения после завершения перетаскивания
+            task.wait(0.1)
+            iconMoved = false
         end
     end)
 
